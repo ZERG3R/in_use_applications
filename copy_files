@@ -1,0 +1,120 @@
+import os
+import win32com.client
+import ctypes
+import sys
+import time
+import re
+import logging
+import datetime
+import shutil
+import socket
+
+
+error_log_online = '\\\\fileserver\\users\\SeanM\\Python\\copyfile_error_log.log'
+error_log_offline = '\\copyfile_error_log.log'
+
+def internet_on(host='8.8.8.8', port=53, timeout=3):
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except Exception as ex:
+        print(ex)
+        return False
+
+def error_logging(location):
+    logging.basicConfig(filename=location, filemode='a', level=logging.DEBUG)
+    curr_time = str(datetime.datetime.today())
+    logging.info(curr_time)
+    logging.info(os.popen('wmic bios get serialnumber').read())
+    sys.stderr = open(location, 'a')
+
+
+def is_admin():
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin()
+    except:
+        print('Re-running as admin')
+        return False
+
+
+def check_admin():
+    if is_admin():
+        copy_files()
+        installers()
+        POS_shortcut()
+        FPM_shortcut()
+        
+    else:
+        ctypes.windll.shell32.ShellExecuteW(None, u"runas", sys.executable, __file__, None, 1)
+        pass
+
+
+def copy_files():
+    if not os.path.isdir('C:\\redacted'):
+        os.mkdir('C:\\redacted')
+    os.system('xcopy E:\\Tablet_Update\\redacted C:\\redacted /O /X /E /H /K')
+
+
+def POS_shortcut():
+    
+    desktop = r'C:\Users\Public\Desktop'
+    POS = os.path.join(desktop, 'redactedPOS.lnk')
+    target = r'C:\\redacted\redactedPOS.exe'
+    wdir = r'C:\\redacted\\'
+
+    shell = win32com.client.Dispatch('WScript.Shell')
+    shortcut = shell.CreateShortCut(POS)
+    shortcut.Targetpath = target
+    shortcut.WorkingDirectory = wdir
+    shortcut.WindowStyle = 7
+    shortcut.save()
+
+
+def FPM_shortcut():
+    
+    desktop = r'C:\Users\Public\Desktop'
+    FPM = os.path.join(desktop, 'Field Program Manager.lnk')
+    target = r'C:\\redacted\Field Program Manager.exe'
+    wdir = r"C:\\redacted\\"
+
+    shell = win32com.client.Dispatch('WScript.Shell')
+    shortcut = shell.CreateShortCut(FPM)
+    shortcut.Targetpath = target
+    shortcut.WorkingDirectory = wdir
+    shortcut.WindowStyle = 7
+    shortcut.save()
+
+
+def installers():
+    try:
+        teamviewer = os.popen('reg query HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\TeamViewer /v ClientID').read()
+        hex_code = re.search(r"(?<=0)[^\]]([0-9])\w+", teamviewer).group(0)
+        print('Teamviewer is installed: ' + str(hex_code))
+    except:
+        print('Teamviewer not installed, running installers')
+
+        time.sleep(.5)
+        os.system('\\Tablet_Update\\vcredist_x86.exe')
+        os.system('\\Tablet_Update\\ChromeSetup.exe')
+        os.system('\\Tablet_Update\\TeamViewer_Setup.exe')
+
+
+def handle_files():
+    sys.stderr.close()
+    logging.shutdown()
+
+
+def main():
+
+    if internet_on():
+        error_logging(error_log_online)
+        check_admin()
+        handle_files()
+    
+    elif not internet_on():
+        error_logging(error_log_offline)
+        check_admin()
+        handle_files()
+
+main()
