@@ -1,0 +1,59 @@
+import gui_t
+
+
+def ourinsta():
+    return input("Please enter your hashtags here: \n")
+
+
+def runchecks(hashcount, hashtags):
+    print('test1')
+    if hashtags is None or hashtags == " ":
+        pass
+    else:
+        hashtagssplit = str(hashtags).split(" ")
+
+        while hashtagssplit[0] == "" or hashtagssplit[0] == " ":
+            hashtagssplit.remove(hashtagssplit[0])
+        while hashtagssplit[-1] == "" or hashtagssplit[-1] == " ":
+            hashtagssplit.remove(hashtagssplit[-1])
+        removedlist = []
+
+        origsize = "The original size of your list of hashtags is: " + str(len(hashtagssplit))
+
+        for i in hashtagssplit:
+            if hashtagssplit.count(i) > 1:
+                hashtagssplit.remove(i)
+                removedlist.append(i)
+        strhashsplit = " ".join(str(x) for x in hashtagssplit)
+
+        removedduplist = "The size of your list after removing duplicates is: " + str(len(hashtagssplit))
+        duplist = "Your duplicates are: " + str(removedlist)
+
+        for i in strhashsplit:
+            if i == """#""":
+                hashcount += 1
+        hashtagcount = 'Your hashtag count is: ' + str(hashcount)
+        over30check = False
+        over30 = ""
+        if hashcount > 30:
+            over30 = 'Your hastag count is over 30, remove some or the text portion will not go through'
+            over30check = True
+        finallist = ('Your final list without duplicates is: \n' + strhashsplit)
+        print('test2')
+        return [origsize, removedduplist, duplist, hashtagcount, over30check, over30, finallist]
+
+
+def main():
+    hashcount = 0
+
+    base = gui_t.base
+
+    ourgui = gui_t.MainApplication(base)
+    ourinput = ourgui.guiinput()
+    ourgui.guionbutton(runchecks=runchecks(hashcount, hashtags=str(ourinput)))
+    #ourgui.guioutput()
+
+    ourgui.mainloop()
+
+
+main()
