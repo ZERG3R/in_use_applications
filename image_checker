@@ -1,0 +1,161 @@
+# need to check  all sub-folders within directory
+
+import os
+from time import sleep
+import datetime
+import re
+import sys
+import logging
+
+file_one = 'file_location_one.txt'
+file_two = 'file_location_two.txt'
+uid_file = 'UID_finder.txt'
+tag_txt = 'tag.txt'
+
+
+def error_log():
+    logging.basicConfig(filename='error_file.log', filemode='a', level=logging.DEBUG)
+    curr_time = str(datetime.datetime.today())
+    logging.info(curr_time)
+    sys.stderr = open('error_file.log', 'a')
+
+
+def image_finder():
+    while True:
+        if not os.path.exists(file_one):
+            with open(file_one, 'w+') as f:
+                print('This script was made by Sean McGirr to check if we are missing images from a directory,'
+                      ' if a UID has been moved to another tag it will not find this UID! \n')
+                location_input_one = input('Where are we looking for images? \n'
+                                           '(This location would contain any missing images, it has everything) \n')
+                sanity_check = input(location_input_one + ' is this the correct location? y/n \n')
+                if sanity_check not in ('y', 'n'):
+                    print('You can only use y or n! Please try again - \n')
+                    sanity_check = input(location_input_one + 'is this the correct location? y/n \n')
+                if sanity_check == 'n':
+                    location_input = input('Where is the location we want to grab images from? \n')
+                    while sanity_check == 'n':
+                        sanity_check = input(location_input + 'is this the correct location? y/n \n')
+                if sanity_check == 'y':
+                    f.write(location_input_one)
+
+        elif os.path.exists(file_one):
+            with open(file_one, 'r') as f:
+                current_location = f.readline()
+                print('Your current location is', str(current_location))
+                file_location_one = input('Are we looking for images in a new location? y/n \n')
+
+                if file_location_one not in ('y', 'n'):
+                    print('Your current location is \n', str(current_location))
+                    file_location_one = input('You can only use y or n! Please try again - \n')
+                if file_location_one == 'y':
+                    new_location_one = input('Please enter your new location: \n')
+                    sanity_check_two = input('Is this new location correct? y/n \n')
+                    while sanity_check_two == 'n':
+                        new_location_one = input('Please enter your new location: \n')
+                        sanity_check_two = input('Is this new location correct? y/n \n')
+                    if sanity_check_two == 'y':
+                        with open(file_one, 'w') as fi:
+                            fi.write(new_location_one)
+
+        file_location_two = input('Search in imageserver3? if no put in your location here (otherwise y): \n')
+        if file_location_two != 'y':
+            sanity_check = input('Is this location correct? y/n \n')
+            if sanity_check == 'y':
+                with open(file_two, 'w') as f:
+                    f.write(file_location_two)
+            while sanity_check == 'n':
+                file_location_two = input('What is the file location? \n')
+                sanity_check = input('Is this location correct? (y/n)\n')
+        if file_location_two == 'y':
+            image_server_3 = '\\imageserver3\\2017-18\\'
+            tag_number = input('What is your tag number? \n')
+            with open(tag_txt, 'w') as f:
+                f.write(tag_number)
+            full_location = image_server_3 + tag_number
+            while not os.path.exists(full_location):
+                try_again = input('This tag number does not exist, please enter a valid number: \n')
+                full_location = image_server_3 + try_again
+            if os.path.exists(full_location):
+                with open(file_two, 'w+') as f:
+                    f.write(full_location)
+        break
+
+
+def find_files():
+    with open(file_one, 'r') as f_one:
+        f_one_line = f_one.readline()
+    with open(file_two) as f_two:
+        f_two_line = f_two.readline()
+        print('\nThis is the location that has all our images: ', f_one_line)
+        print('This is the location that might have missing images:', f_two_line, '\n')
+
+    with open(uid_file, 'w') as f:
+        name_one_list = []
+        name_two_list = []
+
+        new_name_one = os.listdir(f_one_line)
+
+        for i in new_name_one:
+            try:
+                regex_one = re.search(r"([0-9]\d{7})", i)
+                name_one_list.append(regex_one.group(0))
+            except AttributeError:  # there is a hidden thumbs.db file that cannot be deleted (created by windows)
+                pass
+
+        new_name_two = os.listdir(f_two_line)
+
+        for i in new_name_two:
+            try:
+                regex_two = re.search(r"([0-9]\d{7})", i)
+                name_two_list.append(regex_two.group(0))
+
+            except AttributeError:
+                pass
+
+        #print(name_one_list)
+        #print(name_two_list)
+        dictionary_one = dict(zip(name_one_list, new_name_one))
+        #print(dictionary_one)
+
+        openfiles = input('Would you like to open the jpg\'s the script found missing? (y/n) \n')
+        for i in name_one_list:
+
+            if i not in name_two_list:  # if image from laptop/dcs is not on imageserver3
+
+                fname = dictionary_one.get(i)
+
+                f.write(fname + '\n')
+
+                count = 0
+                if openfiles not in ['y', 'n']:
+                    openfiles = input('You can only use (y or n), please enter a valid input \n')
+                if openfiles == 'n':
+                    pass
+                if openfiles == 'y':
+                    try:
+                        ext = os.path.splitext(fname)[-1].lower()
+                        if ext != '.jpg':
+                            pass
+                        else:
+                            os.startfile(f_one_line + '\\' + fname)
+                            print('Opening your file: ', f_one_line + '\\' + fname)
+                            sleep(count)
+                            count += .1
+                    except FileNotFoundError:
+                        print('ERROR Opening your file: ', f_one_line + '\\' + fname)
+
+
+def handle_files():
+    sleep(1)
+    file_size = os.path.getsize(uid_file)
+    if file_size > 0:
+        os.startfile(uid_file)
+    sys.stderr.close()
+    logging.shutdown()
+
+
+error_log()
+image_finder()
+find_files()
+handle_files()
