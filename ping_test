@@ -1,0 +1,310 @@
+import os
+import datetime
+import sys
+import re
+import time
+import logging
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+
+def g_credentials():
+    scope = ['https://spreadsheets.google.com/feeds']
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(
+        'My Project-ca1.json', scope)
+    gc = gspread.authorize(credentials)
+
+    with open(spreadsheet_url, 'r') as spreadsheets:
+        our_spreadsheet = str(spreadsheets.readline())
+        wks1 = gc.open_by_url(our_spreadsheet).sheet1
+        return wks1
+
+# shortcut to link -
+# https://docs.google.com/spreadsheets/d/1q0FmLq2kMowplZSg8GczkvJ3hd-HTsQNtUwCtdRp7nY/edit?usp=sharing
+
+
+spreadsheet_url = 'spreadsheet_url.txt'
+setup = 'setup.txt'
+request_out = 'Request Timed Out'
+count = 2
+countFile = 'count.txt'
+pingfile = 'pingme.txt'
+user_input = 'user_input.txt'
+
+
+def spreadsheet():
+    with open(spreadsheet_url, 'w') as spread_f:
+        url = input('What is your spreadsheet url? (Just copy the direct link from google). \n '
+                    'After entering your URL press the space bar then enter!\n')
+        spread_f.write(url)
+
+
+def error_log():
+    logging.basicConfig(filename='error_file.log', filemode='a', level=logging.DEBUG)
+    curr_time = str(datetime.datetime.today())
+    logging.info('\n' * 5)
+    logging.info(curr_time)
+    sys.stderr = open('error_file.log', 'a')
+
+
+def handle_files():
+    sys.stderr.close()
+    logging.shutdown()
+
+
+def reset():
+    inp = input('Would you like to reset your data? (y/n) \n' + 'On your first run you can do n \n')
+    while inp not in ('y', 'n'):
+        inp = input('Please give a valid input')
+    if inp == 'y':
+        if os.path.exists(countFile):
+            os.remove(countFile)
+        with open(countFile, 'w') as fcw:
+            fcw.write(str(count))
+        cell_list = g_credentials().range('A1:P300')
+        for cell in cell_list:
+            cell.value = ' '
+        print('You will need to delete the cells within the sheet yourself here! Or you can wait until it overwrites')
+        time.sleep(5)
+    if inp == 'n':
+        pass
+
+
+def first_time_setup():
+    with open(setup, 'w') as setup_file:
+        setup_file.write('DISCLAIMER: This script can currently only be run in Windows, for other OS\'s this will not '
+                         'work or you will need to get in touch with the creator if you really want it on another OS '
+                         '(this will require work on your end)( https://twitch.tv/zerg3rr )\n \n'
+                         'This is a setup file to get your script going. In this you will need to create your google '
+                         'sheets page you want to use and follow the directions here - '
+                         'https://developers.google.com/sheets/api/quickstart/python . '
+                         'Once you are done with this links instructions continue reading below.\n'
+                         '\nNow that you\'ve finished setting that up and downloading the files, '
+                         'please place them into the subfolder called "TestPing", if you skip this step it won\'t work!'
+                         '\nNext you will need to first rename the My-Project file to "My Project-ca1.json" '
+                         '(without the quotes) then open the file we renamed (in notepad)'
+                         ' and look for something like this'
+                         '"client_email": "add-timestamp@vital-reef-184822.iam.gserviceaccount.com", from this you '
+                         'need from add- to .com (without the quotes), copy this and share it on the google spreadsheet'
+                         ' you\'re using, make sure it has editing rights! It may send you an email saying this was '
+                         'not valid, you can ignore that. \n \n'
+                         'Next lets deal with our servers and where we want to ping. '
+                         'You will need to open the file named "user_input.txt" and replace the filler lines with the '
+                         'server name and the IP address you want to ping, '
+                         'please make sure to write to those specific lines, otherwise the script will break. '
+                         'It\'s not required that you change to new ip\'s, '
+                         'you can use the pre-made options if you like. \n \n'
+                         'To run this, you need to double click PingTest.exe, you can also right click --> create '
+                         'shortcut, then drag the shortcut onto your desktop to run it from there. \n \n'
+                         'Congrats, you\'re all set up! The only other thing I might recommend adding is some '
+                         'formatting in your google sheet under Format --> Conditional Formatting --> Add a new rule '
+                         '--> then change your fill color and Format cells if "Less than/greater than" so you can see '
+                         'in color what your pings are easily. You could also add a graph, however I haven\'t tried '
+                         'this myself yet so you\'ll have to figure that one out on your own!')
+    if not os.path.exists(user_input):
+        with open(user_input, 'w') as user_inp:
+            user_inp.write('Google Server\n8.8.8.8\nBlizzard WoW Server\n137.221.105.2\n'
+                           'Riot Server\n104.160.131.1\nPUBG Server\n52.20.63.253')
+    if not os.path.exists(countFile):
+        with open(countFile, 'w') as f:
+            f.write('2')
+
+
+def set_up_wks():
+    with open(user_input, 'r') as fi:
+        for i, line in enumerate(fi):
+            if i == 0:
+                server1 = line
+                g_credentials().update_acell('B2', str(server1))
+                g_credentials().update_acell('G2', str(server1))
+                g_credentials().update_acell('L2', str(server1))
+            if i == 2:
+                server2 = line
+                g_credentials().update_acell('C2', str(server2))
+                g_credentials().update_acell('H2', str(server2))
+                g_credentials().update_acell('M2', str(server2))
+            if i == 4:
+                server3 = line
+                g_credentials().update_acell('D2', str(server3))
+                g_credentials().update_acell('I2', str(server3))
+                g_credentials().update_acell('N2', str(server3))
+            if i == 6:
+                server4 = line
+                g_credentials().update_acell('E2', str(server4))
+                g_credentials().update_acell('J2', str(server4))
+                g_credentials().update_acell('O2', str(server4))
+
+    g_credentials().update_acell('B1', 'Constantly Updated')
+    g_credentials().update_acell('G1', '~10 Minute Average')
+    g_credentials().update_acell('L1', 'Total Average')
+
+    g_credentials().update_acell('A2', 'Current Time')
+
+
+def total_averages():
+    g_credentials().update_acell('L3', '=SUM(B3:B10000)/COUNT(B3:B10000)')
+    g_credentials().update_acell('M3', '=SUM(C3:C10000)/COUNT(C3:C10000)')
+    g_credentials().update_acell('N3', '=SUM(D3:D10000)/COUNT(D3:D10000)')
+    g_credentials().update_acell('O3', '=SUM(E3:E10000)/COUNT(E3:E10000)')
+
+    g_credentials().update_acell('F3', 'Most Recent 5 Minutes')
+
+    # 5 minute updating averages
+    with open(countFile, 'r') as count_file:
+        curr_num = count_file.readline()
+        g_credentials().update_acell('G3', '=AVERAGE(FILTER(B:B,ARRAYFORMULA(ROW(A:A)>COUNT(A:A)-25' +
+                                     curr_num + ')))')
+        g_credentials().update_acell('H3', '=AVERAGE(FILTER(C:C,ARRAYFORMULA(ROW(C:C)>COUNT(C:C)-25' +
+                                     curr_num + ')))')
+        g_credentials().update_acell('I3', '=AVERAGE(FILTER(D:D,ARRAYFORMULA(ROW(D:D)>COUNT(D:D)-25' +
+                                     curr_num + ')))')
+        g_credentials().update_acell('J3', '=AVERAGE(FILTER(E:E,ARRAYFORMULA(ROW(E:E)>COUNT(E:E)-25' +
+                                     curr_num + ')))')
+
+
+def time_and_count_interval():
+    currtime = str(datetime.datetime.now())
+    with open(countFile, 'r') as fcr:
+        curr_num = fcr.readline()
+        curr_num = int(curr_num)
+        curr_num += 1
+    with open(countFile, 'w') as fcw:
+        fcw.write(str(curr_num))
+    g_credentials().update_acell('A' + str(curr_num), currtime)
+
+
+def ping_server1():
+    with open(countFile, 'r') as fcr:
+        curr_num = fcr.readline()
+        curr_num = int(curr_num)
+    with open(user_input, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 1:
+                server1_ip = line
+                os.system('ping -n 1 ' + server1_ip.rstrip() + ' > pingme.txt')
+
+    with open(pingfile, 'r') as fr:
+        file_line = fr.readlines()
+        string_file_line = str(file_line)
+        try:
+            pingregex = re.search(r"(?<=time=)([^ms]*)", string_file_line)
+            pingregex = pingregex.group(0)
+            g_credentials().update_acell('B' + str(curr_num), pingregex)
+        except AttributeError:
+            g_credentials().update_acell('B' + str(curr_num), request_out)
+
+
+def ping_server2():
+    with open(countFile, 'r') as fcr:
+        curr_num = fcr.readline()
+        curr_num = int(curr_num)
+    with open(user_input, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 3:
+                server2_ip = line
+                os.system('ping -n 1 ' + server2_ip.rstrip() + ' > pingme.txt')
+    with open(pingfile, 'r') as fr:
+        file_line = fr.readlines()
+        string_file_line = str(file_line)
+        try:
+            pingregex = re.search(r"(?<=time=)([^ms]*)", string_file_line)
+            pingregex = pingregex.group(0)
+            g_credentials().update_acell('C' + str(curr_num), pingregex)
+        except AttributeError:
+            g_credentials().update_acell('C' + str(curr_num), request_out)
+
+
+def ping_server3():
+    with open(countFile, 'r') as fcr:
+        curr_num = fcr.readline()
+        curr_num = int(curr_num)
+    with open(user_input, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 5:
+                server3_ip = line
+                os.system('ping -n 1 ' + server3_ip.rstrip() + ' > pingme.txt')
+    with open(pingfile, 'r') as fr:
+        file_line = fr.readlines()
+        string_file_line = str(file_line)
+        try:
+            pingregex = re.search(r"(?<=time=)([^ms]*)", string_file_line)
+            pingregex = pingregex.group(0)
+            g_credentials().update_acell('D' + str(curr_num), pingregex)
+        except AttributeError:
+            g_credentials().update_acell('D' + str(curr_num), request_out)
+
+
+def ping_server4():
+    with open(countFile, 'r') as fcr:
+        curr_num = fcr.readline()
+        curr_num = int(curr_num)
+    with open(user_input, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 7:
+                server4_ip = line
+                os.system('ping -n 1 ' + server4_ip.rstrip() + ' > pingme.txt')
+    with open(pingfile, 'r') as fr:
+        file_line = fr.readlines()
+        string_file_line = str(file_line)
+        try:
+            pingregex = re.search(r"(?<=time=)([^ms]*)", string_file_line)
+            pingregex = pingregex.group(0)
+            g_credentials().update_acell('E' + str(curr_num), pingregex)
+        except AttributeError:
+            g_credentials().update_acell('E' + str(curr_num), request_out)
+
+
+def main():
+    error_log()
+    print('Please be patient! Sometimes I have to take a few seconds to think...')
+    if not os.path.exists(user_input):
+        first_time_setup()
+        spreadsheet()
+        handle_files()
+        print('Please reference ' + setup + ' this screen will close in 30 seconds')
+        time.sleep(30)
+        sys.exit()
+
+    else:
+        set_up_wks()
+        reset()
+        total_time = 0
+        while True:
+            with open(countFile, 'r') as f2:
+
+                time_and_count_interval()
+
+                start = time.time()
+                line = str(f2.readline())
+                time.sleep(.5)
+                curr_time1 = datetime.datetime.now()
+
+                ping_server1()
+                ping_server2()
+                ping_server3()
+                ping_server4()
+                total_averages()
+
+                end = time.time()
+                elapsed = round(end - start)
+                total_time += elapsed
+                print('Time taken to execute run number ' + str(line) + ' is: ' + str(elapsed))
+                if int(line) % 28 == 0:
+                    with open(countFile, 'r') as f1:
+                        curr_num_line = f1.readline()
+                        curr_num_minus_25 = int(curr_num_line) - 25
+                        minus_one = int(curr_num_line) - 1
+                        g_credentials().update_acell('F' + str(curr_num_line), curr_time1)
+                        g_credentials().update_acell('F' + str(minus_one), '~Last 10 Minutes')
+                        g_credentials().update_acell('G' + str(curr_num_line), '=SUM(B' + str(curr_num_minus_25) + ':B'
+                                                     + str(curr_num_line) + ')/25')
+                        g_credentials().update_acell('H' + str(curr_num_line), '=SUM(C' + str(curr_num_minus_25) + ':C'
+                                                     + str(curr_num_line) + ')/25')
+                        g_credentials().update_acell('I' + str(curr_num_line), '=SUM(D' + str(curr_num_minus_25) + ':D'
+                                                     + str(curr_num_line) + ')/25')
+                        g_credentials().update_acell('J' + str(curr_num_line), '=SUM(E' + str(curr_num_minus_25) + ':E'
+                                                     + str(curr_num_line) + ')/25')
+
+
+main()
