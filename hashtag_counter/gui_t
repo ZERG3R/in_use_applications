@@ -1,0 +1,39 @@
+import tkinter as tk
+
+
+class MainApplication(tk.Frame):
+    def __init__(self, master):
+        tk.Frame.__init__(self, master)
+        labelname = tk.Label(master, text="A Test")
+        labelname.pack()
+        frame = tk.Frame(master)
+        frame.pack()
+
+    def guiinput(self):
+        entry_label = tk.Label(self.master, text="Please enter your hashtags here: ")
+        user_entry = tk.Text(self.master)
+        savedinput = user_entry.get("1.0", tk.END)
+        entry_label.pack()
+        user_entry.pack()
+        print('input test')
+        print(savedinput + ' hello!')
+        return str(savedinput)
+
+    def guionbutton(self, runchecks):
+        button = tk.Button(self.master, text='Go', width=20, command=runchecks)
+        button.pack()
+
+    def guioutput(self, origsize, removedduplist, duplist, hashtagcount, over30check, over30, finallist):
+        output = tk.Text(self.master, height=30, width=100)
+
+        output.insert(tk.END, origsize + '\n')
+        output.insert(tk.END, removedduplist + '\n')
+        output.insert(tk.END, duplist + '\n')
+        output.insert(tk.END, hashtagcount + '\n')
+        if over30check is True:
+            output.insert(tk.END, over30)
+        output.insert(tk.END, finallist + '\n')
+        output.pack()
+
+
+base = tk.Tk()
