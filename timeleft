@@ -1,0 +1,35 @@
+#!python
+# import time
+# time.sleep(15)
+# encoding: utf-8
+
+
+def functimeleft():
+    maxhours = 0
+    hours_okay = False
+    while not hours_okay:
+        maxhours = input('How many hours are you working this week?')
+        hours_okay = maxhours.replace('.', '', 1).isdigit()
+
+    hoursworked = 0
+    hoursokay = False
+    while not hoursokay:
+        hoursworked = input('You have how much time worked so far?')
+        hoursokay = hoursworked.replace('.', '', 1).isdigit()
+
+    timeleft = float(maxhours) * 60 - float(hoursworked) * 60
+    print('You have', timeleft, 'minutes left, or,', int(timeleft/60), 'hours and',
+          (int((timeleft/60) % 1*60)), 'minutes left.')
+    return timeleft
+
+
+def main():
+    import datetime
+    now = datetime.datetime.now()
+    newtime = now + datetime.timedelta(minutes=functimeleft())
+    newtime = newtime
+    formatted = datetime.datetime.strftime(newtime, '%I %M %p')
+    print('You need to leave at', formatted, 'to avoid going over!')
+
+
+main()
