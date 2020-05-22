@@ -1,0 +1,154 @@
+import os
+import exifread
+import rawpy
+import imageio
+
+from collections import defaultdict
+from PIL import Image
+from shutil import copy2
+from skimage.metrics import structural_similarity
+from numpy import asfarray
+
+
+"""
+First walk through and get all jpg file names in jpg_file_dict, then get all file names for raw files dict, 
+after that for any matching base names, compare the jpg to the cr2 until 
+
+Make a dict, filename key, value is full file path
+"""
+
+
+def walkthrough_directory(count):
+    file_dict = defaultdict(list)
+
+    if count == 0:
+        keyword = "RAW"
+        base_directory = "E:\\Pictures\\RAW"
+    elif count == 1:
+        keyword = "JPEG"
+        base_directory = "F:\\"
+
+    """base_directory = input(f"What is your {keyword} parent directory?\n")
+    while not os.path.isdir(base_directory):
+        base_directory = input(f"What is your {keyword} outer directory?\n")"""
+
+    for root, dirs, files in os.walk(base_directory):
+        for file_name in files:
+            filename, file_extension = os.path.splitext(file_name)
+
+            if count == 0:
+                if file_extension == ".RAW" or file_extension == ".CR2":
+                    file_dict[filename].append(os.path.join(base_directory, root, filename + file_extension))
+            elif count == 1:
+                if file_extension == ".jpg":
+                    file_dict[filename].append(os.path.join(base_directory, root, filename + file_extension))
+
+    print(file_dict)
+    return file_dict
+
+
+def get_exif_data(filename):
+    # print(filename)
+    with open(filename, "rb") as f:
+        tags = exifread.process_file(f)
+        # print(tags, "\n")
+        for key in tags:
+            if "DateTimeOriginal" in key:
+                # print(f"{key}: {tags[key]}")
+                full_date = str(tags[key])
+                return full_date
+
+
+def dir_of_path(file_name):
+    our_path = f"{os.path.dirname(os.path.abspath(file_name))}"
+    # print(our_path)
+    return our_path
+
+
+def copy_my_file(full_raw_file, raw_file_name, jpeg_destination):
+    jpeg_raws_subdir = dir_of_path(jpeg_destination) + "\\RAWS"
+    if os.path.isdir(jpeg_raws_subdir):
+        print("seventyone", repr(full_raw_file), repr(jpeg_raws_subdir))
+        copy2(full_raw_file, jpeg_raws_subdir)
+    else:
+        os.mkdir(jpeg_raws_subdir)
+        print("seventyfive", repr(full_raw_file), repr(jpeg_raws_subdir))
+        copy2(full_raw_file, jpeg_raws_subdir)
+
+
+def convert_raw_to_jpeg(raw_image_path):
+    raw = rawpy.imread(raw_image_path)
+    rgb = raw.postprocess()
+    raw_file_name, raw_file_extension = os.path.splitext(raw_image_path)
+    print(raw_file_name, raw_file_extension)
+    imageio.imsave(f"F:\\RAWS_TEMP\{os.path.basename(raw_file_name)}.jpg", rgb)
+
+
+def compare_images():
+    converted_raw_image = "F:\\Events\\Bands\\No_Mind\\2016-8-11\\RAWS\\IMG_0064.CR2"
+    jpeg_image1 = "F:\\Events\\Bands\\No_Mind\\2016-8-11\\IMG_0064.jpg"
+    # os.system(converted_raw_image)
+    # os.system(jpeg_image1)
+
+    jpeg_image2 = Image.open(jpeg_image1).convert("L")
+    jpeg_width, jpeg_height = jpeg_image2.size
+    jpeg_array = asfarray(jpeg_image2)
+
+    raw_resized = Image.open(converted_raw_image).convert("L").resize((jpeg_width, jpeg_height))
+    raw_array = asfarray(raw_resized)
+
+    s1 = structural_similarity(raw_array, jpeg_array)
+    print(s1)
+
+
+def main():
+    print("STARTED")
+    count = 0
+    raws = walkthrough_directory(count)
+    count += 1
+    jpegs = walkthrough_directory(count)
+
+    for file_name_key in jpegs:
+        if file_name_key in raws:
+            for full_path_raw in raws[file_name_key]:
+                for full_path_jpeg in jpegs[file_name_key]:
+                    raw_datetimeoriginal = get_exif_data(full_path_raw)
+
+                    jpeg_datetimeoriginal = get_exif_data(full_path_jpeg)
+
+                    if raw_datetimeoriginal == jpeg_datetimeoriginal:
+
+                        print("one hundred twentysix", f"{file_name_key}    "
+                              f"{jpeg_datetimeoriginal} {jpegs[file_name_key]}        "
+                              f"{raw_datetimeoriginal} {raws[file_name_key]}")
+
+                        path = f"{dir_of_path(full_path_jpeg)}\\raws_files.txt"
+
+                        if os.path.isfile(path):
+                            with open(path, "r") as f_read:
+                                all_lines = [line.rstrip() for line in f_read]
+
+                                if full_path_raw in all_lines:
+                                    print(f"PATH TO FILE- {full_path_raw} already in {path}")
+                                else:
+                                    with open(f"{path}", "a") as f_append:
+                                        f_append.write(f"{full_path_raw}\n")
+                        else:
+                            with open(f"{path}", "a") as f_append:
+                                f_append.write(f"{full_path_raw}\n")
+
+                        try:
+                            copy_my_file(full_raw_file=full_path_raw,
+                                         raw_file_name=os.path.basename(full_path_raw),
+                                         jpeg_destination=full_path_jpeg)
+                        except OSError as e:
+                            with open("F:\\errors.txt", "a") as f:
+                                f.write(f"{e}\n\n {repr(full_path_raw)}    "
+                                        f"{repr(dir_of_path(full_path_jpeg))}\\RAWS\n\n\n\n")
+
+                        print("onehundred fourtyeight", repr(full_path_raw),
+                              repr(dir_of_path(full_path_jpeg) + "\\RAWS"))
+
+
+if __name__ == '__main__':
+    main()
