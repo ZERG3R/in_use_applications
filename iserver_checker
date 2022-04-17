@@ -1,9 +1,35 @@
 import pathlib
 import os
+import time
 import tkinter as tk
 
 from tkinter import ttk
 from dotenv import load_dotenv
+
+
+class Timer:
+    def __init__(self):
+        self.start_time = None
+        self.end_time = None
+        self.last_check_image_num = 0
+        self.new_image_num = 0
+        self.start_or_stop_bool = True  # true == start, false == stop
+
+    def start_timer(self, image_num):
+        self.start_time = time.time()
+        self.last_check_image_num = image_num
+
+    def stop_timer(self, new_image_num):
+        self.end_time = time.time()
+        self.new_image_num = new_image_num
+
+    def calculate_difference(self):
+        num_of_images_moved = self.new_image_num - self.last_check_image_num
+        time_difference = self.end_time - self.start_time
+        time_difference_for_x_images = num_of_images_moved / time_difference
+        return time_difference_for_x_images
+        # total_seconds_for_job = (total_tag_images / num_of_images_moved) * time_difference
+        # return total_seconds_for_job
 
 
 class GuiWindow(tk.Tk):
@@ -11,24 +37,32 @@ class GuiWindow(tk.Tk):
         super().__init__()
 
         # main page configuration details
-        self.title("iServer Transfer Status, Developed by ")
-        self.geometry("1015x360")
+        self.title("iServer Transfer Status, Developed by Sean McGirr")
+        self.geometry("1005x360")
 
         self.columnconfigure(0, weight=0)
         self.rowconfigure(0, weight=0)
+
+        self.timer_obj = Timer()
 
         # env paths & data
         self.iserver_path = ""
         self.imageserver_path = ""
         self.tag_data = {}
+        self.completed_tags = []
+        self.images_per_second = 0
+        self.insert_bool = False
 
         self.list_box = None
+        
+        self.time_remaining_iterations = []
 
         # method calls on startup
         self.check_existing_paths()
         self.show_input_boxes()
         self.show_treeview()
-        self.after(15000, self.update_list_box_view)
+
+        self.after(5000, self.update_list_box_view)
 
     def show_input_boxes(self):
         tag_label = ttk.Label(self.master, text="Enter in a tag:")
@@ -36,19 +70,22 @@ class GuiWindow(tk.Tk):
 
         tag_input_box = tk.Entry(self.master, width=5)
         tag_input_box.grid(row=0, column=1)
+        tag_input_box.bind("<Return>", (lambda event: self.check_if_tag_exists(tag_input_box)))
 
         tag_find_button = tk.Button(text="Enter", command=lambda: self.check_if_tag_exists(tag_input_box))
         tag_find_button.grid(row=0, column=2)
 
     def show_treeview(self):
-        cols = ("Tag", "Number Moved", "Total Number", "Percentage Complete", "Estimated Time Remaining")
-        self.list_box = ttk.Treeview(columns=cols, show='headings')
+        cols = ("Tag", "Number Moved", "Total Number", "Percentage Complete", "~ Time Remaining (H:M:S)")
+        self.list_box = ttk.Treeview(columns=cols, show='headings', height=15)
+        self.list_box.yview()
         for col in cols:
             self.list_box.heading(col, text=col)
         self.list_box.grid(row=3, column=0, columnspan=8)
 
     def update_list_box_view(self):
-        sort_dict = {}
+        if self.insert_bool:
+            self.list_box.delete(*self.list_box.get_children())
         for tag in self.tag_data:
             iserver_file_num = sum(len(filenames)
                                    for (dirpath, dirnames, filenames)
@@ -56,27 +93,72 @@ class GuiWindow(tk.Tk):
             imageserver_file_num = sum(len(filenames)
                                        for (dirpath, dirnames, filenames)
                                        in os.walk(self.tag_data[tag]["imageserver_path"]))
+
+            if iserver_file_num == imageserver_file_num:
+                if tag not in self.completed_tags:
+                    self.completed_tags.insert(0, tag)
+
+            if self.timer_obj.start_or_stop_bool:
+                self.timer_obj.start_timer(imageserver_file_num)
+                self.timer_obj.start_or_stop_bool = False
+            else:
+                self.timer_obj.stop_timer(imageserver_file_num)
+
+                # this is just a float num, how many images per x seconds
+                self.images_per_second = self.timer_obj.calculate_difference()
+                self.timer_obj.start_or_stop_bool = True
+
             self.tag_data[tag]["iserver_file_num"] = iserver_file_num
             self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
 
-            sort_dict[tag] = imageserver_file_num/iserver_file_num
+            print(107, self.tag_data)
+            if tag not in self.completed_tags:
+                percentage = f"""{round(self.tag_data[tag]['imageserver_file_num'] / 
+                                  self.tag_data[tag]['iserver_file_num'] * 
+                                  100, 2)}%"""
+                calculated_seconds_remaining = (self.images_per_second *
+                                                (self.tag_data[tag]["iserver_file_num"] -
+                                                 self.tag_data[tag]["imageserver_file_num"]))
+                self.time_remaining_iterations.append(calculated_seconds_remaining)
+                if calculated_seconds_remaining == 0:
+                    converted_time = "??:??:??"
+                else:
+                    average_time = len(self.time_remaining_iterations) / sum(self.time_remaining_iterations)
+                    converted_time = time.strftime("%H:%M:%S", time.gmtime(average_time))
+                print(124, converted_time)
+                self.list_box.insert("",
+                                     "end",
+                                     values=(tag,
+                                             self.tag_data[tag]["imageserver_file_num"],
+                                             self.tag_data[tag]["iserver_file_num"],
+                                             percentage,
+                                             converted_time))
+                self.insert_bool = True
 
-        sorted_tags = sorted(self.tag_data, key=sort_dict.get)
+        print(121, self.completed_tags)
+        for complete_tag in self.completed_tags:
+            print(123)
+            self.list_box.insert("",
+                                 "end",
+                                 values=(complete_tag,
+                                         self.tag_data[complete_tag]["imageserver_file_num"],
+                                         self.tag_data[complete_tag]["iserver_file_num"],
+                                         self.tag_data[complete_tag]["imageserver_file_num"] /
+                                         self.tag_data[complete_tag]["iserver_file_num"],
+                                         "00:00:00"))
+            self.insert_bool = True
 
-        for s_tag in sorted_tags:
-            self.list_box.insert("", "end", values=(s_tag,
-                                                    self.tag_data[s_tag]["imageserver_file_num"],
-                                                    self.tag_data[s_tag]["iserver_file_num"],
-                                                    self.tag_data[s_tag]["imageserver_file_num"] /
-                                                    self.tag_data[s_tag]["iserver_file_num"],
-                                                    0))
+        self.after(5000, self.update_list_box_view)
+        # self.after(10000, self.show_treeview)
 
     def check_if_tag_exists(self, tag_input_box):
         tag_value = tag_input_box.get()
+        print(102, tag_value)
         if len(tag_value) == 5:
             iserver_tag_path = pathlib.Path(self.iserver_path).joinpath(tag_value)
             imageserver_tag_path = pathlib.Path(self.imageserver_path).joinpath(tag_value)
             if iserver_tag_path.exists():
+                print(107)
                 self.tag_data[tag_value] = {"iserver_path": iserver_tag_path,
                                             "imageserver_path": imageserver_tag_path,
                                             "iserver_file_num": 0,
