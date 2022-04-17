@@ -207,11 +207,9 @@ class GuiWindow(tk.Tk):
             self.imageserver_path = os.environ.get("imageserver3")
         else:
             iserver_button_val = self.set_up_new_window("iserver")
-            # G:\Donner_Image_Backup\2016-11-16
             iserver_button_val.wait_variable()
 
             imageserver_button_val = self.set_up_new_window("imageserver3")
-            # G:\Test_files
             imageserver_button_val.wait_variable()
 
             with open(".env", "w") as f:
