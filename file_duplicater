@@ -1,0 +1,30 @@
+import random
+import shutil
+import time
+import pathlib
+import os
+
+
+def start_transfer():
+    copy_dir = r"G:\filepath"
+    destination_dir = r"G:\Test_files\copied"
+    copy_folders = []
+
+    for folder in copy_folders:
+        destination_dir = destination_dir + f"\\{folder}"
+        pathlib.Path(destination_dir).mkdir(exist_ok=True)
+        dir_path = pathlib.Path(copy_dir).joinpath(folder)
+        for _, _, filenames in os.walk(dir_path):
+            for file in filenames:
+                fullpath = pathlib.Path(dir_path).joinpath(file)
+                destination_path = pathlib.Path(destination_dir).joinpath(file)
+                if destination_path.is_file() is False:
+                    print(f"Image {file} does not exist yet at {destination_path}")
+                    shutil.copy(fullpath, destination_path)
+                else:
+                    print(f"Image {file} already exists at {destination_path}")
+                time.sleep(random.randint(1, 2))
+        destination_dir = r"G:\Test_files\copied"
+
+
+start_transfer()
