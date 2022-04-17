@@ -23,15 +23,15 @@ class Timer:
         self.end_time = time.time()
         self.new_image_num = new_image_num
 
-    def calculate_difference(self, images_per_second):
+    def calculate_difference(self):
         num_of_images_moved = self.new_image_num - self.last_check_image_num
         time_difference = self.end_time - self.start_time
-        if time_difference > 0:
+        if time_difference > 0 and num_of_images_moved > 0:
             # this is images per second
             time_difference_for_x_images = num_of_images_moved / time_difference
-            return time_difference_for_x_images
+            return [time_difference_for_x_images, True]
         else:
-            return images_per_second
+            return [0, False]
         # total_seconds_for_job = (total_tag_images / num_of_images_moved) * time_difference
         # return total_seconds_for_job
 
@@ -65,6 +65,7 @@ class GuiWindow(tk.Tk):
         self.previous_jobs_seconds = 0
 
         self.current_working_tag = 0
+        self.active_calculation = False
 
         # method calls on startup
         self.check_existing_paths()
@@ -93,13 +94,6 @@ class GuiWindow(tk.Tk):
         self.list_box.grid(row=3, column=0, columnspan=8)
 
     def update_list_box_view(self):
-        def convert_seconds(seconds):
-            seconds = int(seconds)
-            minutes, seconds = divmod(seconds, 60)
-            hours, minutes = divmod(minutes, 60)
-
-            return f"{hours:d}:{minutes:02d}:{seconds:02d}"
-
         if self.insert_bool:
             self.list_box.delete(*self.list_box.get_children())
 
@@ -114,38 +108,26 @@ class GuiWindow(tk.Tk):
             self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
 
             current_working_tag = self.get_current_working_tag(tag)
-            # print(f"Current tag iteration: {tag}, Current working tag: {current_working_tag}")
             if tag == current_working_tag:
                 data = self.calculation_logic(tag, iserver_file_num, imageserver_file_num)
 
                 if data is not None:
                     percentage = data[0]
-                    average_time_per_image = data[1]
-
-                    self.previous_jobs_seconds = average_time_per_image * (self.tag_data[tag]["iserver_file_num"] -
-                                                                           self.tag_data[tag]["imageserver_file_num"])
-                    print(126,
-                          tag,
-                          self.previous_jobs_seconds,
-                          average_time_per_image)
-                    """self.tag_data[tag]["iserver_file_num"],
-                    self.tag_data[tag]["imageserver_file_num"],
-                    self.tag_data[tag]["iserver_file_num"] - self.tag_data[tag]["imageserver_file_num"])"""
-                    converted_time = convert_seconds(seconds=self.previous_jobs_seconds)
+                    calculated_time_remaining = data[1]
+                    self.previous_jobs_seconds = round(calculated_time_remaining, 2)
+                    converted_time = self.convert_seconds(seconds=self.previous_jobs_seconds)
                 else:
                     percentage = "0%"
                     converted_time = "??:??:??"
             else:
-                percentage = "unknown%"
-                self.previous_jobs_seconds = round((self.images_per_second *
-                                                    (self.tag_data[tag]["imageserver_file_num"] -
-                                                     self.tag_data[tag]["iserver_file_num"])) +
-                                                   self.previous_jobs_seconds, 2)
-                print(123,
-                      tag,
-                      self.previous_jobs_seconds,
-                      self.images_per_second)
-                converted_time = convert_seconds(seconds=self.previous_jobs_seconds)
+                percentage = f"""{round(self.tag_data[tag]['imageserver_file_num'] /
+                                        self.tag_data[tag]['iserver_file_num'] *
+                                        100, 2)}%"""
+                curr_jobs_seconds = round(self.images_per_second *
+                                          (self.tag_data[tag]["iserver_file_num"] -
+                                           self.tag_data[tag]["imageserver_file_num"]))
+                self.previous_jobs_seconds = round(curr_jobs_seconds + self.previous_jobs_seconds, 2)
+                converted_time = self.convert_seconds(seconds=self.previous_jobs_seconds)
 
             if tag not in self.completed_tags:
                 self.list_box.insert("",
@@ -170,6 +152,14 @@ class GuiWindow(tk.Tk):
 
         self.after(5000, self.update_list_box_view)
 
+    @staticmethod
+    def convert_seconds(seconds):
+        seconds = int(seconds)
+        minutes, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+
+        return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+
     def get_current_working_tag(self, tag):
         if self.current_working_tag not in self.completed_tags:
             if self.current_working_tag == 0:
@@ -181,7 +171,6 @@ class GuiWindow(tk.Tk):
                 if len(list(self.tag_data.keys())) > 1:
                     index_to_tag_conversion = (list(self.tag_data.keys())[last_completed_tag_index + 1])
                     self.current_working_tag = index_to_tag_conversion
-                    print(111, self.current_working_tag, last_completed_tag_index + 1, index_to_tag_conversion)
                 else:
                     self.current_working_tag = tag
             else:
@@ -200,45 +189,38 @@ class GuiWindow(tk.Tk):
             self.timer_obj.stop_timer(imageserver_file_num)
 
             # this is just a float num, how many images per x seconds
-            self.images_per_second = round(self.timer_obj.calculate_difference(self.images_per_second), 2)
+            calc_data = self.timer_obj.calculate_difference()
+            self.images_per_second = round(calc_data[0], 2)
+            self.active_calculation = calc_data[1]
             self.timer_obj.start_or_stop_bool = True
 
-        # print(107, self.tag_data)
         if tag not in self.completed_tags:
             percentage = f"""{round(self.tag_data[tag]['imageserver_file_num'] /
                                     self.tag_data[tag]['iserver_file_num'] *
                                     100, 2)}%"""
-            calculated_seconds_remaining = round(self.images_per_second *
-                                                 (self.tag_data[tag]["iserver_file_num"] -
-                                                  self.tag_data[tag]["imageserver_file_num"]), 2)
 
-            if calculated_seconds_remaining <= 0:
+            if not self.active_calculation:
                 self.zero_seconds_counter += 1
                 if len(self.timeout_seconds) == 0:
-                    self.timeout_seconds.append(5)
+                    self.timeout_seconds.append((iserver_file_num - imageserver_file_num) * 2)
                 else:
-                    last_seconds_item = self.timeout_seconds[-1]  # type: int
-                    self.timeout_seconds.append(last_seconds_item + 5)
+                    last_seconds_item = self.timeout_seconds[-1]  # # type: int
+                    self.timeout_seconds.append(last_seconds_item + 30)
+                self.images_per_second = 0
+                num_of_items = (len(self.time_remaining_iterations) + len(self.timeout_seconds))
+                sum_of_time = (sum(self.time_remaining_iterations) + sum(self.timeout_seconds))
+                # 5 / 3 = 1.67, 5 items over 3 seconds is 1.67 seconds per item
+                calculated_seconds_remaining = (sum_of_time / num_of_items)
+                self.images_per_second = calculated_seconds_remaining / self.timeout_seconds[-1]
+
             else:
+                calculated_seconds_remaining = round(self.images_per_second *
+                                                     (self.tag_data[tag]["iserver_file_num"] -
+                                                      self.tag_data[tag]["imageserver_file_num"]), 2)
                 self.zero_seconds_counter = 0
                 self.timeout_seconds = []
                 self.time_remaining_iterations.append(calculated_seconds_remaining)
-
-            if len(self.timeout_seconds) > 0:
-                num_of_items = (len(self.time_remaining_iterations) + len(self.timeout_seconds))
-                sum_of_time = (sum(self.time_remaining_iterations) + sum(self.timeout_seconds))
-                average_time_per_image = (sum_of_time / num_of_items)
-
-                print(220, average_time_per_image)
-
-            else:
-                print(225, len(self.time_remaining_iterations),
-                      sum(self.time_remaining_iterations), len(self.time_remaining_iterations) /
-                      sum(self.time_remaining_iterations))
-                average_time_per_image = (sum(self.time_remaining_iterations) / len(self.time_remaining_iterations))
-                print(230, average_time_per_image)
-                self.images_per_second = average_time_per_image
-            return [percentage, average_time_per_image]
+            return [percentage, calculated_seconds_remaining]
 
     def check_if_tag_exists(self, tag_input_box):
         tag_value = tag_input_box.get()
