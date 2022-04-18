@@ -53,11 +53,12 @@ class GuiWindow(tk.Tk):
         self.iserver_path = ""
         self.imageserver_path = ""
         self.tag_data = {}
+        self.tag_order_list = []
         self.completed_tags = []
         self.images_per_second = 0
         self.insert_bool = False
 
-        self.list_box = None
+        self.tree_view = None
 
         self.time_remaining_iterations = []
         self.timeout_seconds = []
@@ -66,6 +67,7 @@ class GuiWindow(tk.Tk):
 
         self.current_working_tag = 0
         self.active_calculation = False
+        self.inserted_num = 0
 
         # method calls on startup
         self.check_existing_paths()
@@ -87,17 +89,40 @@ class GuiWindow(tk.Tk):
 
     def show_treeview(self):
         cols = ("Tag", "Number Moved", "Total Number", "Percentage Complete", "~ Time Remaining (HH:MM:SS)")
-        self.list_box = ttk.Treeview(columns=cols, show='headings', height=15)
-        self.list_box.yview()
+        self.tree_view = ttk.Treeview(columns=cols, show='headings', height=15)
+        self.tree_view.yview()
+        self.tree_view.bind("<B1-Motion>", self.tree_move)
         for col in cols:
-            self.list_box.heading(col, text=col)
-        self.list_box.grid(row=3, column=0, columnspan=8)
+            self.tree_view.heading(col, text=col)
+        self.tree_view.grid(row=3, column=0, columnspan=8)
+
+    def tree_move(self, event):
+        tv = event.widget
+        moveto = tv.index(tv.identify_row(event.y))
+        for s in tv.selection():
+            tv.move(s, '', moveto)
+        item = self.tree_view.identify("item", event.x, event.y)
+        item_data = self.tree_view.item(item, "text")
+        # print(106, moveto, item_data)
+        self.tag_data[item_data]["gui_updated_location"] = moveto
 
     def update_list_box_view(self):
         if self.insert_bool:
-            self.list_box.delete(*self.list_box.get_children())
+            self.tag_order_list = []
+            for tag in self.tag_data.keys():
+                if tag not in self.completed_tags and tag not in self.tag_order_list:
+                    self.tag_order_list.append(tag)
+                if tag not in self.completed_tags:
+                    if self.tag_data[tag]["index_insertion_location"] != self.tag_data[tag]["gui_updated_location"]:
+                        if self.tag_data[tag]["gui_updated_location"] != -1:
+                            moved_tag = self.tag_order_list.pop(self.tag_data[tag]["index_insertion_location"])
+                            self.tag_order_list.insert(self.tag_data[tag]["gui_updated_location"], moved_tag)
+                            # implement new order here
+                            # make a list and then display data based off list, can insert/move items appropriately
+            self.tree_view.delete(*self.tree_view.get_children())
 
-        for tag in self.tag_data:
+        id_counter = 0
+        for tag in self.tag_order_list:
             iserver_file_num = sum(len(filenames)
                                    for (dirpath, dirnames, filenames)
                                    in os.walk(self.tag_data[tag]["iserver_path"]))
@@ -107,7 +132,7 @@ class GuiWindow(tk.Tk):
             self.tag_data[tag]["iserver_file_num"] = iserver_file_num
             self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
 
-            current_working_tag = self.get_current_working_tag(tag)
+            current_working_tag = self.tag_order_list[0]  # self.get_current_working_tag(tag) old solution
             if tag == current_working_tag:
                 data = self.calculation_logic(tag, iserver_file_num, imageserver_file_num)
 
@@ -130,25 +155,32 @@ class GuiWindow(tk.Tk):
                 converted_time = self.convert_seconds(seconds=self.previous_jobs_seconds)
 
             if tag not in self.completed_tags:
-                self.list_box.insert("",
-                                     "end",
-                                     values=(tag,
-                                             self.tag_data[tag]["imageserver_file_num"],
-                                             self.tag_data[tag]["iserver_file_num"],
-                                             percentage,
-                                             converted_time))
-                self.insert_bool = True
+                self.tree_view.insert("",
+                                      "end",
+                                      iid=id_counter,
+                                      text=tag,
+                                      values=(tag,
+                                              self.tag_data[tag]["imageserver_file_num"],
+                                              self.tag_data[tag]["iserver_file_num"],
+                                              percentage,
+                                              converted_time))
+                id_counter += 1
+
         self.previous_jobs_seconds = 0
 
         for complete_tag in self.completed_tags:
-            self.list_box.insert("",
-                                 "end",
-                                 values=(complete_tag,
-                                         self.tag_data[complete_tag]["imageserver_file_num"],
-                                         self.tag_data[complete_tag]["iserver_file_num"],
-                                         "100%",
-                                         "Completed Transfer"))
-            self.insert_bool = True
+            if self.tag_data[complete_tag]["iserver_file_num"] != self.tag_data[complete_tag]["imageserver_file_num"]:
+                self.completed_tags.remove(complete_tag)
+            self.tree_view.insert("",
+                                  "end",
+                                  iid=id_counter,
+                                  text=complete_tag,
+                                  values=(complete_tag,
+                                          self.tag_data[complete_tag]["imageserver_file_num"],
+                                          self.tag_data[complete_tag]["iserver_file_num"],
+                                          "100%",
+                                          "Completed Transfer"))
+            id_counter += 1
 
         self.after(5000, self.update_list_box_view)
 
@@ -168,9 +200,13 @@ class GuiWindow(tk.Tk):
         else:
             if len(self.completed_tags) >= 1:
                 last_completed_tag_index = list(self.tag_data.keys()).index(self.completed_tags[0])
-                if len(list(self.tag_data.keys())) > 1:
-                    index_to_tag_conversion = (list(self.tag_data.keys())[last_completed_tag_index + 1])
-                    self.current_working_tag = index_to_tag_conversion
+                dict_list_length = len(list(self.tag_data.keys()))
+                if dict_list_length > 1:
+                    print(187, tag, len(list(self.tag_data.keys())), last_completed_tag_index + 1)
+                    if len(list(self.tag_data.keys())) > last_completed_tag_index + 1:
+                        index_to_tag_conversion = (list(self.tag_data.keys())[last_completed_tag_index + 1])
+                        print(index_to_tag_conversion)
+                        self.current_working_tag = index_to_tag_conversion
                 else:
                     self.current_working_tag = tag
             else:
@@ -231,7 +267,12 @@ class GuiWindow(tk.Tk):
                 self.tag_data[tag_value] = {"iserver_path": iserver_tag_path,
                                             "imageserver_path": imageserver_tag_path,
                                             "iserver_file_num": 0,
-                                            "imageserver_file_num": 0}
+                                            "imageserver_file_num": 0,
+                                            "index_insertion_location": self.inserted_num,
+                                            "gui_updated_location": -1}
+                self.insert_bool = True
+                print(270, self.tag_data)
+                self.inserted_num += 1
         tag_input_box.delete(0, tk.END)
 
     def set_up_new_window(self, location_title):
