@@ -123,18 +123,21 @@ class GuiWindow(tk.Tk):
 
         id_counter = 0
         for tag in self.tag_order_list:
-            iserver_file_num = sum(len(filenames)
-                                   for (dirpath, dirnames, filenames)
-                                   in os.walk(self.tag_data[tag]["iserver_path"]))
+            for dirpath, dirnames, filenames in os.walk(self.tag_data[tag]["iserver_path"]):
+                jpegs = [os.path.join(dirpath, f) for f in filenames if f.endswith('.jpg')]
+                print(128, jpegs)
+                iserver_file_num = len(jpegs)
+                self.tag_data[tag]["iserver_file_num"] = iserver_file_num
+
             imageserver_file_num = sum(len(filenames)
                                        for (dirpath, dirnames, filenames)
                                        in os.walk(self.tag_data[tag]["imageserver_path"]))
-            self.tag_data[tag]["iserver_file_num"] = iserver_file_num
+
             self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
 
             current_working_tag = self.tag_order_list[0]  # self.get_current_working_tag(tag) old solution
             if tag == current_working_tag:
-                data = self.calculation_logic(tag, iserver_file_num, imageserver_file_num)
+                data = self.calculation_logic(tag, self.tag_data[tag]["iserver_file_num"], imageserver_file_num)
 
                 if data is not None:
                     percentage = data[0]
@@ -214,7 +217,7 @@ class GuiWindow(tk.Tk):
         return self.current_working_tag
 
     def calculation_logic(self, tag, iserver_file_num, imageserver_file_num):
-        if iserver_file_num == imageserver_file_num:
+        if (iserver_file_num - int(iserver_file_num * .005)) == imageserver_file_num:
             if tag not in self.completed_tags:
                 self.completed_tags.insert(0, tag)
 
@@ -312,7 +315,8 @@ class GuiWindow(tk.Tk):
             path_text_box.delete(0, tk.END)
 
     def check_existing_paths(self):
-        curr_path = pathlib.Path(__file__).parent.resolve()
+        curr_path = pathlib.Path.cwd()
+        print(curr_path)
         env_file = pathlib.Path(curr_path).joinpath(".env")
         if env_file.exists():
             load_dotenv()
@@ -327,7 +331,7 @@ class GuiWindow(tk.Tk):
             # G:\Test_files
             imageserver_button_val.wait_variable()
 
-            with open(".env", "w") as f:
+            with open(env_file, "w") as f:
                 f.write(f"iserver={self.iserver_path}\nimageserver3={self.imageserver_path}")
 
 
@@ -336,4 +340,5 @@ def main():
     gui.mainloop()
 
 
-main()
+if __name__ == "__main__":
+    main()
