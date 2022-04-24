@@ -68,6 +68,7 @@ class GuiWindow(tk.Tk):
         self.current_working_tag = 0
         self.active_calculation = False
         self.inserted_num = 0
+        self.iserver_math_diff = 0
 
         # method calls on startup
         self.check_existing_paths()
@@ -110,7 +111,7 @@ class GuiWindow(tk.Tk):
         if self.insert_bool:
             self.tag_order_list = []
             for tag in self.tag_data.keys():
-                if tag not in self.completed_tags and tag not in self.tag_order_list:
+                if tag not in self.tag_order_list and tag not in self.completed_tags:
                     self.tag_order_list.append(tag)
                 if tag not in self.completed_tags:
                     if self.tag_data[tag]["index_insertion_location"] != self.tag_data[tag]["gui_updated_location"]:
@@ -119,25 +120,29 @@ class GuiWindow(tk.Tk):
                             self.tag_order_list.insert(self.tag_data[tag]["gui_updated_location"], moved_tag)
                             # implement new order here
                             # make a list and then display data based off list, can insert/move items appropriately
+                else:
+                    if tag in self.tag_order_list:
+                        self.tag_order_list.remove(tag)
             self.tree_view.delete(*self.tree_view.get_children())
 
         id_counter = 0
         for tag in self.tag_order_list:
             for dirpath, dirnames, filenames in os.walk(self.tag_data[tag]["iserver_path"]):
                 jpegs = [os.path.join(dirpath, f) for f in filenames if f.endswith('.jpg')]
-                print(128, jpegs)
                 iserver_file_num = len(jpegs)
                 self.tag_data[tag]["iserver_file_num"] = iserver_file_num
 
-            imageserver_file_num = sum(len(filenames)
-                                       for (dirpath, dirnames, filenames)
-                                       in os.walk(self.tag_data[tag]["imageserver_path"]))
-
-            self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
+            for dirpath, dirnames, filenames in os.walk(self.tag_data[tag]["imageserver_path"]):
+                jpegs = [os.path.join(dirpath, f) for f in filenames if f.endswith('.jpg')]
+                imageserver_file_num = len(jpegs)
+                self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
 
             current_working_tag = self.tag_order_list[0]  # self.get_current_working_tag(tag) old solution
             if tag == current_working_tag:
-                data = self.calculation_logic(tag, self.tag_data[tag]["iserver_file_num"], imageserver_file_num)
+                print(143, tag, self.completed_tags)
+                data = self.calculation_logic(tag,
+                                              self.tag_data[tag]["iserver_file_num"],
+                                              self.tag_data[tag]["imageserver_file_num"])
 
                 if data is not None:
                     percentage = data[0]
@@ -172,8 +177,12 @@ class GuiWindow(tk.Tk):
         self.previous_jobs_seconds = 0
 
         for complete_tag in self.completed_tags:
-            if self.tag_data[complete_tag]["iserver_file_num"] != self.tag_data[complete_tag]["imageserver_file_num"]:
+            # would need to make a query for each tag again to determine if numbers changed
+            """if self.iserver_file_num_calc(self.tag_data[complete_tag]["iserver_file_num"]) > \
+                    self.tag_data[complete_tag]["imageserver_file_num"] - self.iserver_math_diff:
+                print(182, self.iserver_file_num_calc(self.tag_data[complete_tag]["iserver_file_num"]), self.tag_data[complete_tag]["imageserver_file_num"] - self.iserver_math_diff)
                 self.completed_tags.remove(complete_tag)
+                self.tag_order_list.append(complete_tag)"""
             self.tree_view.insert("",
                                   "end",
                                   iid=id_counter,
@@ -216,8 +225,14 @@ class GuiWindow(tk.Tk):
                 self.current_working_tag = tag
         return self.current_working_tag
 
+    def iserver_file_num_calc(self, iserver_file_num):
+        self.iserver_math_diff = iserver_file_num * .005
+        return iserver_file_num - self.iserver_math_diff
+
     def calculation_logic(self, tag, iserver_file_num, imageserver_file_num):
-        if (iserver_file_num - int(iserver_file_num * .005)) == imageserver_file_num:
+        print(229, self.iserver_file_num_calc(iserver_file_num), imageserver_file_num)
+        if self.iserver_file_num_calc(iserver_file_num) <= imageserver_file_num - self.iserver_math_diff:
+            print(230, tag, self.iserver_file_num_calc(iserver_file_num), imageserver_file_num - self.iserver_math_diff)
             if tag not in self.completed_tags:
                 self.completed_tags.insert(0, tag)
 
@@ -250,7 +265,8 @@ class GuiWindow(tk.Tk):
                 sum_of_time = (sum(self.time_remaining_iterations) + sum(self.timeout_seconds))
                 # 5 / 3 = 1.67, 5 items over 3 seconds is 1.67 seconds per item
                 calculated_seconds_remaining = (sum_of_time / num_of_items)
-                self.images_per_second = calculated_seconds_remaining / self.timeout_seconds[-1]
+                if self.timeout_seconds[-1] > 0:
+                    self.images_per_second = calculated_seconds_remaining / self.timeout_seconds[-1]
 
             else:
                 calculated_seconds_remaining = round(self.images_per_second *
