@@ -67,7 +67,7 @@ class GuiWindow(tk.Tk):
 
         self.current_working_tag = 0
         self.active_calculation = False
-        # self.inserted_num = 0
+        self.inserted_num = 0
         self.iserver_math_diff = 0
 
         # method calls on startup
@@ -124,14 +124,8 @@ class GuiWindow(tk.Tk):
                             except IndexError as e:
                                 print(125, e)
                 else:
-                    # the remove is necessary and works, nothing else in here works however
                     if tag in self.tag_order_list:
                         self.tag_order_list.remove(tag)
-                        index_loc = list(self.tag_data[tag].keys()).index(tag)
-                        # move everything after the removed tag down by 1
-                        for tag1 in self.tag_data:
-                            if list(self.tag_data[tag].keys()).index(tag1) > index_loc:
-                                self.tag_data[tag]["index_insertion_location"] -= 1
             self.tree_view.delete(*self.tree_view.get_children())
 
         id_counter = 0
@@ -296,10 +290,11 @@ class GuiWindow(tk.Tk):
                                             "imageserver_path": imageserver_tag_path,
                                             "iserver_file_num": 0,
                                             "imageserver_file_num": 0,
-                                            "index_insertion_location": len(self.tag_order_list) + 1,
+                                            "index_insertion_location": self.inserted_num,
                                             "gui_updated_location": -1}
                 self.insert_bool = True
                 print(270, self.tag_data)
+                self.inserted_num += 1
         tag_input_box.delete(0, tk.END)
 
     def set_up_new_window(self, location_title):
