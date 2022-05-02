@@ -41,7 +41,8 @@ class GuiWindow(tk.Tk):
         super().__init__()
 
         # main page configuration details
-        self.title("iServer Transfer Status, Developed by Sean McGirr")
+        self.version = "0.3"
+        self.title(f"iServer Transfer Status, Version {self.version}")
         self.geometry("1005x360")
 
         self.columnconfigure(0, weight=0)
@@ -130,15 +131,17 @@ class GuiWindow(tk.Tk):
 
         id_counter = 0
         for tag in self.tag_order_list:
+            self.tag_data[tag]["iserver_file_num"] = 0
+            self.tag_data[tag]["imageserver_file_num"] = 0
             for dirpath, dirnames, filenames in os.walk(self.tag_data[tag]["iserver_path"]):
                 jpegs = [os.path.join(dirpath, f) for f in filenames if f.endswith('.jpg')]
                 iserver_file_num = len(jpegs)
-                self.tag_data[tag]["iserver_file_num"] = iserver_file_num
+                self.tag_data[tag]["iserver_file_num"] += iserver_file_num
 
             for dirpath, dirnames, filenames in os.walk(self.tag_data[tag]["imageserver_path"]):
                 jpegs = [os.path.join(dirpath, f) for f in filenames if f.endswith('.jpg')]
                 imageserver_file_num = len(jpegs)
-                self.tag_data[tag]["imageserver_file_num"] = imageserver_file_num
+                self.tag_data[tag]["imageserver_file_num"] += imageserver_file_num
 
             current_working_tag = self.tag_order_list[0]  # self.get_current_working_tag(tag) old solution
             if tag == current_working_tag:
@@ -234,7 +237,7 @@ class GuiWindow(tk.Tk):
 
     def calculation_logic(self, tag, iserver_file_num, imageserver_file_num):
         print(229, self.iserver_file_num_calc(iserver_file_num), imageserver_file_num)
-        if self.iserver_file_num_calc(iserver_file_num) <= imageserver_file_num - self.iserver_math_diff:
+        if imageserver_file_num >= iserver_file_num:
             print(230, tag, self.iserver_file_num_calc(iserver_file_num), imageserver_file_num - self.iserver_math_diff)
             if tag not in self.completed_tags:
                 self.completed_tags.insert(0, tag)
